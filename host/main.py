@@ -20,6 +20,18 @@ import logging
 import threading
 import traceback
 
+# ── 快速路径：桌面右键菜单「喂鱼」触发（<exe> --feed）──────────────────
+# 只写一个信号文件就退出，不加载 WebView2 等重量级模块，启动极快。
+if "--feed" in sys.argv:
+    _appdata = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Deskworlds")
+    try:
+        os.makedirs(_appdata, exist_ok=True)
+        with open(os.path.join(_appdata, ".feed_request"), "w", encoding="utf-8") as _f:
+            _f.write("1")
+    except Exception:
+        pass
+    sys.exit(0)
+
 # ★ 必须在创建任何窗口之前开启 DPI 感知，否则 WinForms 返回的是 125%/150% 缩放后的
 # 逻辑像素（如 1920x1200 屏幕只得到 1536x960），壁纸铺不满全屏。
 try:
@@ -37,11 +49,20 @@ PROJECT = os.path.dirname(HERE)  # deskworlds-win/
 
 
 def _resolve_scene_root():
-    """定位场景目录：优先同级 ../deskworlds（开发布局），其次子目录 ./deskworlds（打包布局）。"""
-    candidates = [
-        os.path.join(PROJECT, "..", "deskworlds"),
-        os.path.join(PROJECT, "deskworlds"),
-    ]
+    """定位场景目录，兼容三种布局：
+    1) 打包后：<exe同级>/deskworlds 或 <_MEIPASS>/deskworlds
+    2) 仓库布局：<PROJECT>/deskworlds（子目录）
+    3) 开发布局：<PROJECT>/../deskworlds（同级）
+    """
+    bases = []
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            bases.append(meipass)
+        bases.append(os.path.dirname(sys.executable))
+    bases.append(PROJECT)
+    candidates = [os.path.join(b, "deskworlds") for b in bases]
+    candidates.append(os.path.join(PROJECT, "..", "deskworlds"))
     for p in candidates:
         if os.path.exists(os.path.join(p, "scenes")):
             return os.path.normpath(p).replace("\\", "/")
@@ -181,6 +202,15 @@ class App:
         log.info("poll loop started")
         while not self._stop.is_set():
             try:
+                # 桌面右键菜单「喂鱼」信号：检测到就投喂一次
+                feed_flag = os.path.join(cfgmod.APP_DIR, ".feed_request")
+                if os.path.exists(feed_flag):
+                    try:
+                        os.remove(feed_flag)
+                    except Exception:
+                        pass
+                    self.feed()
+
                 # 电源
                 bat = desktop.is_on_battery()
                 if bat != self._last_battery:
@@ -359,6 +389,13 @@ def main():
         log.warning("已有 Deskworlds 实例在运行，本次启动退出。")
         print("Deskworlds is already running. Check the system tray.")
         sys.exit(0)
+    # 注册桌面右键菜单「喂鱼」（用户级注册表，失败不影响主功能）
+    try:
+        import shellmenu
+        if shellmenu.register():
+            log.info("desktop context menu registered")
+    except Exception as e:
+        log.debug("register context menu failed: %s", e)
     # 延迟一点再最小化，让用户先看到启动提示（若从 run.bat 直接启动）
     threading.Thread(target=lambda: (time.sleep(2), _minimize_console()), daemon=True).start()
     try:

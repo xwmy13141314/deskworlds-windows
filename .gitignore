@@ -14,6 +14,11 @@ final_verify*.png
 verify_screenshot.png
 *_raw.png
 
+# 打包产物（不入库，作为 Release 附件发布）
+dist/
+build/
+*.zip
+
 # 编辑器 / 系统
 .vscode/
 .idea/

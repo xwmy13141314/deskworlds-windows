@@ -7,6 +7,26 @@
 
 ---
 
+## [1.1.0] - 2026-11-19
+
+### 新增（Added）
+
+- **桌面右键菜单「喂鱼 🐟」**：桌面空白处右键 →「显示更多选项」→「喂鱼 🐟（桌面世界）」，直接投喂当前世界。
+  - 实现：`host/shellmenu.py` 写入用户级注册表 `HKCU\Software\Classes\DesktopBackground\Shell\DeskworldsFeed`，无需管理员权限。
+  - 触发：菜单执行 `Deskworlds.exe --feed` → 写信号文件 → 主程序轮询消费并投喂。
+  - 注：Windows 11 的简化右键菜单会把传统项收进「显示更多选项」。
+- **免安装打包**：`Deskworlds.spec` 用 PyInstaller 打包为独立可执行程序（`dist/Deskworlds/`），自带 Python 运行时，双击 `Deskworlds.exe` 即可运行，无需安装 Python。
+- **随包使用说明**：`使用说明.txt`，面向非技术同事的操作指引。
+- **应用图标**：`tools/make_icon.py` 生成 `app.ico`。
+
+### 技术要点
+
+- `--feed` 走快速路径：只写 `%APPDATA%\Deskworlds\.feed_request` 后立即退出，不加载 WebView2，启动极快。
+- 打包使用 `console=True`（带控制台）：实测无控制台会导致 WebView2 GPU 子进程崩溃；控制台由程序启动后自动最小化。
+- 场景路径解析兼容三种布局：打包后 `_MEIPASS/deskworlds`、仓库子目录 `./deskworlds`、开发同级 `../deskworlds`。
+
+---
+
 ## [1.0.0] - 2026-11-19
 
 首个正式发布版。实现 Windows 动态壁纸宿主，完整复用上游 `deskworlds` 的 7 个 3D 场景。
