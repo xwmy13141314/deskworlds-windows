@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# 运行时 / 临时文件
+*.log
+*.tmp
+instance.lock
+desk_check*.png
+final_verify*.png
+verify_screenshot.png
+*_raw.png
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地配置（不应提交）
+config.local.json
