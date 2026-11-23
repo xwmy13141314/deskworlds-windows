@@ -348,15 +348,32 @@ class App:
             threading.Thread(target=self.tray.update, daemon=True).start()
 
     def quit(self):
+        """从托盘菜单回调退出。
+
+        ★ 关键：本方法运行在 pystray 托盘线程里。若直接调用 tray.stop()
+        （内部 icon.stop() 会 join 托盘线程），等于线程等自己结束 → 死锁，
+        表现就是"点退出没反应"。因此把所有清理放到独立线程，主回调立即返回，
+        最后用 os._exit 强制结束进程。
+        """
         log.info("quit")
         self._stop.set()
-        if self.tray:
-            self.tray.stop()
-        try:
-            WinForms.Application.ExitThread()
-        except Exception:
-            pass
-        os._exit(0)
+
+        def _shutdown():
+            # 给托盘回调一点时间先返回，再停图标，避免 self-join 死锁
+            time.sleep(0.3)
+            if self.tray:
+                try:
+                    self.tray.stop()
+                except Exception:
+                    pass
+            try:
+                WinForms.Application.ExitThread()
+            except Exception:
+                pass
+            time.sleep(0.2)
+            os._exit(0)
+
+        threading.Thread(target=_shutdown, daemon=True).start()
 
     def run(self):
         # 动态读取 pythonnet 需要的 System.Action（在 UI 模块加载后）
