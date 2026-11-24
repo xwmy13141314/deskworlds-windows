@@ -22,11 +22,12 @@ import traceback
 
 # ── 快速路径：桌面右键菜单「喂鱼」触发（<exe> --feed）──────────────────
 # 只写一个信号文件就退出，不加载 WebView2 等重量级模块，启动极快。
-if "--feed" in sys.argv:
+if "--feed" in sys.argv or "--quit" in sys.argv:
     _appdata = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Deskworlds")
     try:
         os.makedirs(_appdata, exist_ok=True)
-        with open(os.path.join(_appdata, ".feed_request"), "w", encoding="utf-8") as _f:
+        flag = ".quit_request" if "--quit" in sys.argv else ".feed_request"
+        with open(os.path.join(_appdata, flag), "w", encoding="utf-8") as _f:
             _f.write("1")
     except Exception:
         pass
@@ -210,6 +211,17 @@ class App:
                     except Exception:
                         pass
                     self.feed()
+
+                # 桌面右键菜单「退出壁纸」信号：强制退出（绕过可能失效的托盘图标）
+                quit_flag = os.path.join(cfgmod.APP_DIR, ".quit_request")
+                if os.path.exists(quit_flag):
+                    try:
+                        os.remove(quit_flag)
+                    except Exception:
+                        pass
+                    log.info("quit via desktop context menu")
+                    # 直接强杀自身进程，最快最可靠（托盘图标会随进程结束被系统清理）
+                    os._exit(0)
 
                 # 电源
                 bat = desktop.is_on_battery()

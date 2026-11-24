@@ -11,17 +11,17 @@ import winreg
 
 MENU_KEY = r"Software\Classes\DesktopBackground\Shell\DeskworldsFeed"
 MENU_LABEL = "喂鱼 🐟（桌面世界）"
+QUIT_KEY = r"Software\Classes\DesktopBackground\Shell\DeskworldsQuit"
+QUIT_LABEL = "退出壁纸 ❌（桌面世界）"
 
 
-def _exe_command():
-    """返回用于右键菜单的命令行（含 --feed）。"""
+def _exe_command(flag="--feed"):
+    """返回用于右键菜单的命令行。"""
     if getattr(sys, "frozen", False):
-        # PyInstaller 打包后：直接用 exe 自身
-        return '"%s" --feed' % sys.executable
-    # 开发模式：python + main.py
+        return '"%s" %s' % (sys.executable, flag)
     py = sys.executable
     main_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py")
-    return '"%s" "%s" --feed' % (py, main_py)
+    return '"%s" "%s" %s' % (py, main_py, flag)
 
 
 def _icon_path():
@@ -32,27 +32,36 @@ def _icon_path():
 
 
 def register():
-    """注册桌面右键菜单项。已存在则覆盖。"""
-    cmd = _exe_command()
+    """注册桌面右键菜单项（喂鱼 + 退出）。已存在则覆盖。"""
     icon = _icon_path()
     try:
+        # 喂鱼项
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY) as k:
             winreg.SetValueEx(k, "", 0, winreg.REG_SZ, MENU_LABEL)
             if icon:
                 winreg.SetValueEx(k, "Icon", 0, winreg.REG_SZ, icon)
-            # 让菜单项在 Win11 也尽量显示（不加 Extended 表示常规显示）
             winreg.SetValueEx(k, "Position", 0, winreg.REG_SZ, "Bottom")
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY + r"\command") as k:
-            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, cmd)
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, _exe_command("--feed"))
+
+        # 退出项
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, QUIT_KEY) as k:
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, QUIT_LABEL)
+            if icon:
+                winreg.SetValueEx(k, "Icon", 0, winreg.REG_SZ, icon)
+            winreg.SetValueEx(k, "Position", 0, winreg.REG_SZ, "Bottom")
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, QUIT_KEY + r"\command") as k:
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, _exe_command("--quit"))
         return True
     except Exception:
         return False
 
 
 def unregister():
-    """删除桌面右键菜单项。"""
+    """删除桌面右键菜单项（喂鱼 + 退出）。"""
     try:
         _delete_tree(winreg.HKEY_CURRENT_USER, MENU_KEY)
+        _delete_tree(winreg.HKEY_CURRENT_USER, QUIT_KEY)
         return True
     except Exception:
         return False
