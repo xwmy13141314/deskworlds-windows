@@ -7,8 +7,11 @@ APP_NAME = "Deskworlds"
 
 
 def _command():
+    # 打包环境：直接自启 exe 自身（最可靠，避免 pythonw 托盘图标异常）
+    if getattr(sys, "frozen", False):
+        return '"%s"' % sys.executable
+    # 开发环境：pythonw + main.py
     here = os.path.dirname(os.path.abspath(__file__))
-    project = os.path.dirname(here)
     main_py = os.path.join(here, "main.py")
     pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
     if not os.path.exists(pythonw):

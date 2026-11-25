@@ -387,6 +387,37 @@ class App:
 
         threading.Thread(target=_shutdown, daemon=True).start()
 
+    def _hotkey_loop(self):
+        """全局热键 Ctrl+Alt+Q 强制退出（绕过任何托盘图标问题）。
+
+        在自己的线程注册热键并跑 GetMessage 循环；收到 WM_HOTKEY 直接 os._exit。
+        这是最后的兜底：无论托盘图标是否失效，按热键一定能退出。
+        """
+        try:
+            import ctypes
+            from ctypes import wintypes
+            u = ctypes.windll.user32
+            MOD_CONTROL, MOD_ALT = 0x0002, 0x0001
+            VK_Q = 0x51
+            WM_HOTKEY = 0x0312
+            if not u.RegisterHotKey(None, 1, MOD_CONTROL | MOD_ALT, VK_Q):
+                log.debug("register hotkey Ctrl+Alt+Q failed: %s", ctypes.get_last_error())
+                return
+            log.info("hotkey Ctrl+Alt+Q registered for emergency quit")
+
+            class MSG(ctypes.Structure):
+                _fields_ = [("hwnd", wintypes.HWND), ("message", wintypes.UINT),
+                            ("wParam", wintypes.WPARAM), ("lParam", wintypes.LPARAM),
+                            ("time", wintypes.DWORD), ("pt", wintypes.POINT)]
+
+            msg = MSG()
+            while u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                if msg.message == WM_HOTKEY and msg.wParam == 1:
+                    log.info("quit via hotkey Ctrl+Alt+Q")
+                    os._exit(0)
+        except Exception as e:
+            log.debug("hotkey loop error: %s", e)
+
     def run(self):
         # 动态读取 pythonnet 需要的 System.Action（在 UI 模块加载后）
         global System
@@ -397,6 +428,7 @@ class App:
         t.SetApartmentState(ApartmentState.STA)
         t.Start()
         threading.Thread(target=self._poll_loop, daemon=True).start()
+        threading.Thread(target=self._hotkey_loop, daemon=True).start()
         self.tray = Tray(self)
         self.tray.run()
 
